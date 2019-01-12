@@ -25,17 +25,17 @@ This code should be used by flask_test. Run flask_test if u just want to run thi
 The projects that I have looked into are: deepgaze faceswap facedetection
 
 Functions that should be used: func_read_face, func_swap_with_face, func_output_img
-(processed FsImage class)func_read_face(string: folder containing face image)
+(list of processed FsImage class)func_read_face(string: folder containing face image)
 this function should take one image containing one face only, folder passed for the initial intended function:
 matching face image with the closest head image. But the matching algorithm never works as the photo focal length is
 unknown and the photos are usually modified so that focal length cannot be calculated neither. This leads to very
 inaccurate face facing(if that makes any sense) and hilarious output image. That's why this function is removed.
 If multiple file or faces exist, the first file first face should be used.
 
-(output CV2 image)func_swap_with_face(FsImage class face, string; folder containing head image)
+(list of output CV2 image)func_swap_with_face(FsImage class face, string; folder containing head image)
 This function swaps all faces from all files in the folder with the provided FsImage face
 
-func_output_img(CV2 image for output, string: Path to output file ie. /outputpath/output.jpg)
+func_output_img(list of CV2 image for output, string: Path to output file ie. /outputpath/output.jpg)
 This function outputs the CV2 image to a given path.
 
 How it works:
@@ -185,9 +185,21 @@ class NoFaces(Exception):
 
 class FsImage:
     # This is a data class storing one image. containing path and filename, image itself, landmarks and number of faces
-    def __init__(self, image):
-        self.path_n_name = image
-        self.im_content = cv2.imread(image, cv2.IMREAD_COLOR)
+    def __init__(self):
+        self.path_n_name = "EMPTY"
+        self.im_content = None
+        self.landmarks = None
+        self.n_faces = 0
+
+    def load_from_file(self, img_path):
+        self.path_n_name = img_path
+        self.im_content = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        self.landmarks = get_landmarks(self.im_content)
+        self.n_faces = len(self.landmarks)
+
+    def load_from_CV2(self, img, img_path):
+        self.path_n_name = img_path
+        self.im_content = img
         self.landmarks = get_landmarks(self.im_content)
         self.n_faces = len(self.landmarks)
 
@@ -380,33 +392,32 @@ def correct_colours(im1, im2, landmarks1):
 def swap_face(ims1, ims2):
     tmp_set = []
     for back_img in ims1:  # get every image and landmark (every image)
-        im_tmp = back_img.im_content  # store that image
 
         for back_lm_lmk in back_img.landmarks:  # every back landmark and vector (every face), swap every face
 
             matrix = transformation_from_points(back_lm_lmk[ALIGN_POINTS],
                                                 ims2[0].get_landmark(0)[ALIGN_POINTS])
             mask = get_face_mask(ims2[0].im_content, ims2[0].get_landmark(0))
-            warped_mask = warp_im(mask, matrix, im_tmp.shape)
-            combined_mask = numpy.max([get_face_mask(im_tmp, back_lm_lmk), warped_mask],
+            warped_mask = warp_im(mask, matrix, back_img.im_content.shape)
+            combined_mask = numpy.max([get_face_mask(back_img.im_content, back_lm_lmk), warped_mask],
                                       axis=0)
 
-            warped_im2 = warp_im(ims2[0].im_content, matrix, im_tmp.shape)
-            warped_corrected_im2 = correct_colours(im_tmp, warped_im2, back_lm_lmk)
-            im_tmp = im_tmp * (1.0 - combined_mask) + warped_corrected_im2 * combined_mask
+            warped_im2 = warp_im(ims2[0].im_content, matrix, back_img.im_content.shape)
+            warped_corrected_im2 = correct_colours(back_img.im_content, warped_im2, back_lm_lmk)
+            back_img.im_content = back_img.im_content * (1.0 - combined_mask) + warped_corrected_im2 * combined_mask
 
-        tmp_set.append([im_tmp, back_img.path_n_name])  # save that image
+        tmp_set.append(back_img)  # save that image
 
     return tmp_set
 
 
 def pic_output(im_set, out_path):
     for im in im_set:
-        if im[0].shape[1] > 500:
-            factor = 500.0 / im[0].shape[1]
-            im[0] = cv2.resize(im[0], (int(im[0].shape[1] * factor),
-                                 int(im[0].shape[0] * factor)))
-        cv2.imwrite(out_path, im[0])
+        if im.im_content.shape[1] > 500:
+            factor = 500.0 / im.im_content.shape[1]
+            im.im_content = cv2.resize(im.im_content, (int(im.im_content.shape[1] * factor),
+                            int(im.im_content.shape[0] * factor)))
+        cv2.imwrite(out_path, im.im_content)
 
 
 def save_face(im, lm):  # unused
@@ -422,7 +433,8 @@ def load_face():  # unused
 def read_all_image(path):
     image_set = []
     for filename in glob.glob(os.path.join(path, '*.jpg')):
-        im = FsImage(filename)
+        im = FsImage()
+        im.load_from_file(filename)
         image_set.append(im)
     return image_set
 
@@ -438,9 +450,9 @@ def func_swap_with_face(proc_img_face, raw_img_back_path):
     return output_img
 
 
-def func_output_img(output_img, out_path):
+def func_output_img(output_img_set, out_path):
 
-    pic_output(output_img, out_path)
+    pic_output(output_img_set, out_path)
     return
 
 
