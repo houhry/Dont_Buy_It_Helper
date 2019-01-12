@@ -152,7 +152,7 @@ landmarks_3D = numpy.float32([P3D_RIGHT_SIDE,
 
 # Points used to line up the images.
 ALIGN_POINTS = (LEFT_BROW_POINTS + RIGHT_EYE_POINTS + LEFT_EYE_POINTS +
-                               RIGHT_BROW_POINTS + NOSE_POINTS + MOUTH_POINTS)
+                RIGHT_BROW_POINTS + NOSE_POINTS + MOUTH_POINTS + JAW_POINTS)
 
 # Points from the second image to overlay on the first. The convex hull of each
 # element will be overlaid.
@@ -402,7 +402,10 @@ def swap_face(ims1, ims2):
 
 def pic_output(im_set, out_path):
     for im in im_set:
-        print("output ", im[1]+"output")
+        if im[0].shape[1] > 500:
+            factor = 500.0 / im[0].shape[1]
+            im[0] = cv2.resize(im[0], (int(im[0].shape[1] * factor),
+                                 int(im[0].shape[0] * factor)))
         cv2.imwrite(out_path, im[0])
 
 
@@ -436,6 +439,7 @@ def func_swap_with_face(proc_img_face, raw_img_back_path):
 
 
 def func_output_img(output_img, out_path):
+
     pic_output(output_img, out_path)
     return
 
