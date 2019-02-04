@@ -94,6 +94,7 @@ import os
 import glob
 import math
 
+
 PREDICTOR_PATH = "shape_predictor_68_face_landmarks.dat"  # for DLIB
 PROTOTXT = "deploy.prototxt.txt"  # for DNN
 DNN_MODEL = "res10_300x300_ssd_iter_140000.caffemodel"  # for DNN
@@ -101,6 +102,8 @@ SCALE_FACTOR = 1
 FEATHER_AMOUNT = 11
 DETECTOR_TYPE = "DLIB"  # DLIB DNN
 DNN_NOFACE_THRESH = 0.5
+
+MAX_IMAGE_SIZE = 500.0  # pix, higher for better quality, may crash if set too high
 
 # For face facing detection, not used
 FACE_POINTS = list(range(17, 68))
@@ -193,7 +196,17 @@ class FsImage:
 
     def load_from_file(self, img_path):
         self.path_n_name = img_path
+        while True:
+            with open(img_path, 'rb') as f:
+                check_chars = f.read()[-2:]
+            if check_chars == b'\xff\xd9':
+                break
+
         self.im_content = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        if self.im_content.shape[1] > MAX_IMAGE_SIZE:
+            factor = MAX_IMAGE_SIZE / self.im_content.shape[1]
+            self.im_content = cv2.resize(self.im_content, (int(self.im_content.shape[1] * factor),
+                                                           int(self.im_content.shape[0] * factor)))
         self.landmarks = get_landmarks(self.im_content)
         self.n_faces = len(self.landmarks)
 
@@ -269,7 +282,7 @@ def get_landmarks(im):
         _t_mat = [[p.x, p.y] for p in predictor(im, rects[i]).parts()]
 
         lm_list.append(numpy.matrix(_t_mat))
-
+    print("lm_passed")
     return lm_list  # returns a list of landmarks
 
 
@@ -353,9 +366,16 @@ def transformation_from_points(points1, points2):
 
 
 def read_im_and_landmarks(fname):
+    print("start_reading_file")
+
+
     im = cv2.imread(fname, cv2.IMREAD_COLOR)
-    im = cv2.resize(im, (im.shape[1] * SCALE_FACTOR,
-                         im.shape[0] * SCALE_FACTOR))
+    print("Finished_reading_file")
+    if im.im_content.shape[1] > MAX_IMAGE_SIZE:
+        factor = MAX_IMAGE_SIZE / im.im_content.shape[1]
+        im.im_content = cv2.resize(im.im_content, (int(im.im_content.shape[1] * factor),
+                                                   int(im.im_content.shape[0] * factor)))
+
     s = get_landmarks(im)
 
     return im, s, fname
@@ -392,7 +412,7 @@ def correct_colours(im1, im2, landmarks1):
 def swap_face(ims1, ims2):
     tmp_set = []
     for back_img in ims1:  # get every image and landmark (every image)
-
+        print('face0')
         for back_lm_lmk in back_img.landmarks:  # every back landmark and vector (every face), swap every face
 
             matrix = transformation_from_points(back_lm_lmk[ALIGN_POINTS],
@@ -413,8 +433,8 @@ def swap_face(ims1, ims2):
 
 def pic_output(im_set, out_path):
     for im in im_set:
-        if im.im_content.shape[1] > 500:
-            factor = 500.0 / im.im_content.shape[1]
+        if im.im_content.shape[1] > MAX_IMAGE_SIZE:
+            factor = MAX_IMAGE_SIZE / im.im_content.shape[1]
             im.im_content = cv2.resize(im.im_content, (int(im.im_content.shape[1] * factor),
                             int(im.im_content.shape[0] * factor)))
         cv2.imwrite(out_path, im.im_content)

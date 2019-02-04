@@ -44,7 +44,7 @@ from faceswap import func_read_face, func_swap_with_face, func_output_img  # for
 app = Flask(__name__)
 
 random.seed()
-
+state = 0
 
 @app.route('/')  # not really used now, created for debugging purposes
 def home():
@@ -59,22 +59,29 @@ def send_img():
 @app.route('/up/', methods=['GET', 'POST'])  # the userscript should POST the link to original photo and GET the popup
 # with modified photo
 def my_form_post():
+    global state
     if request.method == 'POST':
         text = request.data.decode("ascii")
         # print("got txt: " + text)
         req.urlretrieve(text, "raw_photo/temp_raw_img.jpg")
+        func_output_img(func_swap_with_face(proc_face, "raw_photo"), "processed_photo/output.jpg")
+        state = 1
         return "good"  # for debugging purposes
     else:
+        while state == 0:
+            tmp = 0
         return "http://localhost:5000/popup/"
 
 
 @app.route('/popup/')
 def popup():  # when the popup is called, modified photo is generated from raw background and pre calculated face image
+    global state
     # folders passed into these functions allowing swapping all images under same folder. Currently redundant.
-    func_output_img(func_swap_with_face(proc_face, "raw_photo"), "processed_photo/output.jpg")
-    sleep(0.1)  # sometimes the image would be NULL, I'm guessing it's the page returned before image file generated.
+
+   # sleep(2)  # sometimes the image would be NULL, I'm guessing it's the page returned before image file generated.
     # adding some delay seems to help this problem
     # a random string added after the link so the browser will not cache the image
+    state = 0
     return render_template('popup.html', modded_image=('http://localhost:5000/image/'+"?" + str(random.randrange(99999))))
 
 
