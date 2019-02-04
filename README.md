@@ -1,5 +1,15 @@
 # Dont_Buy_It_Helper
 
+UPDATE 02042019
+
+Fixed the bug where half the image would be GREY
+
+Fixed the bug that crashed on extra large input photos
+
+Increased the output image size a bit
+
+The program now waits for image read and write, and seems to be slower
+
 Harley Hou 12/01/2019
 
 项目里的一切我都是第一次用:)
